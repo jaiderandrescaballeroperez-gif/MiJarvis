@@ -1,79 +1,62 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 
 # --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Jarvis - Jaider", page_icon="🤖")
+st.set_page_config(page_title="Jarvis Ultra", page_icon="🤖")
 
 # --- 2. SEGURIDAD ---
 API_KEY = "AIzaSyBxGrdOa17_PCkLTiGElVJxZy3AWfZxNZY"
-genai.configure(api_key=API_KEY)
+# Construimos la URL manual para forzar la versión estable v1
+URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
 # --- 3. DISEÑO ---
 st.markdown("""
     <style>
-    .stApp { background-color: #000; color: #0ff; }
-    h1 { text-align: center; text-shadow: 0 0 10px #0ff; }
-    .stChatMessage { border: 1px solid #0ff; border-radius: 10px; }
+    .stApp { background-color: #050505; color: #00ffff; }
+    .stChatMessage { border: 1px solid #00ffff; border-radius: 15px; background: rgba(0, 255, 255, 0.05); }
+    h1 { text-align: center; text-shadow: 0 0 15px #0ff; font-family: 'Courier New', monospace; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1>🤖 Jarvis Activo</h1>", unsafe_allow_html=True)
+st.markdown("<h1>🤖 JARVIS: PROTOCOLO DIRECTO</h1>", unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- 4. CONFIGURACIÓN DEL MODELO (EL TRUCO) ---
-# Creamos una configuración que "salte" los errores de versión
-generation_config = {
-  "temperature": 0.7,
-  "top_p": 0.95,
-  "top_k": 64,
-  "max_output_tokens": 65536,
-}
-
-try:
-    # Usamos gemini-1.5-flash-latest que es la dirección más exacta
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
-        generation_config=generation_config,
-    )
-except Exception as e:
-    st.error(f"Error inicial: {e}")
-
-# Mostrar chat
+# Mostrar historial
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# --- 4. FUNCIÓN DE ENVÍO DIRECTO ---
+def llamar_ai(texto):
+    payload = {
+        "contents": [{"parts": [{"text": texto}]}]
+    }
+    headers = {'Content-Type': 'application/json'}
+    
+    # Hacemos la petición manual al servidor de Google
+    response = requests.post(URL, headers=headers, data=json.dumps(payload))
+    
+    if response.status_code == 200:
+        datos = response.json()
+        return datos['candidates'][0]['content']['parts'][0]['text']
+    else:
+        return f"Error de servidor ({response.status_code}): {response.text}"
+
 # --- 5. INTERACCIÓN ---
-if prompt := st.chat_input("Señor Jaider, ¿qué desea saber?"):
+if prompt := st.chat_input("Señor Jaider, ordene..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        try:
-            # LLAMADA DIRECTA AL CONTENIDO
-            response = model.generate_content(prompt)
-            
-            if response and response.text:
-                full_res = response.text
-                st.markdown(full_res)
-                st.session_state.messages.append({"role": "assistant", "content": full_res})
-            else:
-                st.error("Google no devolvió respuesta. Reintenta en 10 segundos.")
-                
-        except Exception as e:
-            # Si falla el Flash, usamos el Pro como respaldo automático
-            try:
-                st.warning("Reintentando con modo de respaldo...")
-                model_alt = genai.GenerativeModel("gemini-1.0-pro")
-                response = model_alt.generate_content(prompt)
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-            except:
-                st.error(f"Error de conexión de Google: {e}")
+        with st.spinner("Conectando con el núcleo..."):
+            respuesta = llamar_ai(prompt)
+            st.markdown(respuesta)
+            st.session_state.messages.append({"role": "assistant", "content": respuesta})
 
-if st.sidebar.button("Limpiar"):
+if st.sidebar.button("Reiniciar Sistema"):
     st.session_state.messages = []
     st.rerun()
