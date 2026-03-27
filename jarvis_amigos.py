@@ -8,7 +8,6 @@ from datetime import datetime
 st.set_page_config(page_title="¡Hola!", page_icon="🌐", layout="wide")
 
 # --- 2. SEGURIDAD ---
-# Tu llave está aquí, no la cambies
 GOOGLE_API_KEY = "AIzaSyD-JokRZd00OUzg1mMjpUGOLm9meRA1B8k"
 genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -31,9 +30,13 @@ st.markdown("<h1>¡Hola!</h1>", unsafe_allow_html=True)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- 6. MODELO ---
-# Usamos el nombre más estándar posible
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- 6. CAMBIO DE MODELO A GEMINI-PRO (EL QUE NO FALLA) ---
+try:
+    # Usamos 'gemini-pro' que es la versión más compatible universalmente
+    model = genai.GenerativeModel('gemini-pro')
+except Exception as e:
+    st.error(f"Error al inicializar: {e}")
+    st.stop()
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -48,20 +51,26 @@ if prompt := st.chat_input("¿En qué puedo ayudarlo, Señor Jaider?"):
     with st.chat_message("assistant"):
         placeholder = st.empty()
         try:
-            # MÉTODO ULTRA-SIMPLE: Sin historial complejo, solo la pregunta
-            # Esto evita el 99% de los errores 404 en la nube
+            # Llamada directa
             response = model.generate_content(prompt)
             
             if response.text:
                 full_res = response.text
                 placeholder.markdown(full_res)
             else:
-                full_res = "La IA no pudo generar una respuesta."
+                full_res = "Lo siento, no pude generar una respuesta. Intente de nuevo."
                 st.warning(full_res)
             
         except Exception as e:
-            st.error(f"Error: {e}")
-            full_res = "Error de conexión."
+            # Si gemini-pro también falla, intentamos con el nombre técnico
+            try:
+                model_alt = genai.GenerativeModel('models/gemini-pro')
+                response = model_alt.generate_content(prompt)
+                full_res = response.text
+                placeholder.markdown(full_res)
+            except:
+                st.error(f"Error persistente: {e}")
+                full_res = "Error de comunicación con los servidores de Google."
 
     st.session_state.messages.append({"role": "assistant", "content": full_res})
 
