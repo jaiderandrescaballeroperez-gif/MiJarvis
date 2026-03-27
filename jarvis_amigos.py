@@ -30,12 +30,13 @@ st.markdown("<h1>¡Hola!</h1>", unsafe_allow_html=True)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- 6. MODELO ---
-model = genai.GenerativeModel('gemini-1.5-flash')
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# --- 6. MODELO CON NOMBRE ALTERNATIVO ---
+try:
+    # Cambia 'gemini-1.5-flash' por este nombre más específico:
+    model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+except Exception as e:
+    st.error(f"Error al cargar el modelo: {e}")
+    st.stop()
 
 # --- 7. CHAT ---
 if prompt := st.chat_input("¿En qué puedo ayudarlo, Señor Jaider?"):
