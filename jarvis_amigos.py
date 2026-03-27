@@ -1,65 +1,79 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Jarvis - Jaider", page_icon="🤖", layout="wide")
+# --- 1. CONFIGURACIÓN ---
+st.set_page_config(page_title="Jarvis - Jaider", page_icon="🤖")
 
-# --- 2. SEGURIDAD (Nueva API Key) ---
-NUEVA_API_KEY = "AIzaSyBxGrdOa17_PCkLTiGElVJxZy3AWfZxNZY"
+# --- 2. SEGURIDAD ---
+API_KEY = "AIzaSyBxGrdOa17_PCkLTiGElVJxZy3AWfZxNZY"
+genai.configure(api_key=API_KEY)
 
-# Configuración ultra-limpia
-genai.configure(api_key=NUEVA_API_KEY)
-
-# --- 3. ESTILO VISUAL ---
+# --- 3. DISEÑO ---
 st.markdown("""
     <style>
     .stApp { background-color: #000; color: #0ff; }
     h1 { text-align: center; text-shadow: 0 0 10px #0ff; }
-    .stChatMessage { border: 1px solid #0ff; border-radius: 10px; margin-bottom: 10px; }
+    .stChatMessage { border: 1px solid #0ff; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1>🤖 Jarvis: Sistema Activo</h1>", unsafe_allow_html=True)
+st.markdown("<h1>🤖 Jarvis Activo</h1>", unsafe_allow_html=True)
 
-# --- 4. INICIALIZAR MODELO ---
-try:
-    # Usamos el nombre del modelo sin prefijos raros
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except Exception as e:
-    st.error(f"Error al inicializar modelo: {e}")
-
-# --- 5. GESTIÓN DE CHAT ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Mostrar historial
+# --- 4. CONFIGURACIÓN DEL MODELO (EL TRUCO) ---
+# Creamos una configuración que "salte" los errores de versión
+generation_config = {
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "top_k": 64,
+  "max_output_tokens": 65536,
+}
+
+try:
+    # Usamos gemini-1.5-flash-latest que es la dirección más exacta
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash-latest",
+        generation_config=generation_config,
+    )
+except Exception as e:
+    st.error(f"Error inicial: {e}")
+
+# Mostrar chat
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- 6. INTERACCIÓN ---
-if prompt := st.chat_input("¿Qué desea consultar, Señor Jaider?"):
+# --- 5. INTERACCIÓN ---
+if prompt := st.chat_input("Señor Jaider, ¿qué desea saber?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         try:
-            # Respuesta directa sin streaming para evitar errores 400/404
+            # LLAMADA DIRECTA AL CONTENIDO
             response = model.generate_content(prompt)
             
-            if response.text:
+            if response and response.text:
                 full_res = response.text
                 st.markdown(full_res)
                 st.session_state.messages.append({"role": "assistant", "content": full_res})
             else:
-                st.warning("El modelo no devolvió texto. Reintente.")
+                st.error("Google no devolvió respuesta. Reintenta en 10 segundos.")
                 
         except Exception as e:
-            st.error(f"Detalle técnico: {e}")
-            st.info("Nota: Si sale 404, espera 2 minutos a que Google active la nueva llave.")
+            # Si falla el Flash, usamos el Pro como respaldo automático
+            try:
+                st.warning("Reintentando con modo de respaldo...")
+                model_alt = genai.GenerativeModel("gemini-1.0-pro")
+                response = model_alt.generate_content(prompt)
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+            except:
+                st.error(f"Error de conexión de Google: {e}")
 
-# Botón para resetear
-if st.sidebar.button("Borrar Memoria"):
+if st.sidebar.button("Limpiar"):
     st.session_state.messages = []
     st.rerun()
