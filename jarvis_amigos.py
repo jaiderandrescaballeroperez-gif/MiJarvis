@@ -1,29 +1,32 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Jarvis Final", page_icon="🤖")
 
-# --- 2. SEGURIDAD ---
-# ASEGÚRATE DE QUE ESTA SEA LA LLAVE DEL PROYECTO NUEVO QUE CREASTE
-API_KEY = "AIzaSyC8Q_7hBBV8_iiQVd_1kRkZjGeCz622UrM"
-genai.configure(api_key=API_KEY)
+# --- 2. SEGURIDAD (Modo Invisible) ---
+if "GOOGLE_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+else:
+    st.error("⚠️ Falta la llave en los Secrets de Streamlit.")
+    st.stop()
 
-# --- 3. DISEÑO ---
-st.markdown("<h1 style='text-align: center; color: #0ff;'>🤖 Jarvis Online</h1>", unsafe_allow_html=True)
+# --- 3. DISEÑO VISUAL ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #000; color: #0ff; }
+    h1 { text-align: center; text-shadow: 0 0 10px #0ff; }
+    .stChatMessage { border: 1px solid #0ff; border-radius: 10px; background: rgba(0,255,255,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.markdown("<h1>🤖 Jarvis: Protocolo Activo</h1>", unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- 4. FUNCIÓN DE RESPUESTA RÁPIDA ---
-def chat_con_google(query):
-    try:
-        # Usamos el modelo más básico para asegurar conexión
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(query)
-        return response.text
-    except Exception as e:
-        return f"Error de conexión: {str(e)}"
+# --- 4. MOTOR DE IA ---
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Mostrar historial
 for message in st.session_state.messages:
@@ -31,20 +34,16 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # --- 5. INTERACCIÓN ---
-if prompt := st.chat_input("Escriba aquí, Señor Jaider..."):
+if prompt := st.chat_input("Señor Jaider, sistema listo para su consulta..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # Esto evita que se quede cargando infinito
-        with st.status("Conectando...", expanded=True) as status:
-            respuesta = chat_con_google(prompt)
-            status.update(label="Respuesta recibida", state="complete", expanded=False)
-            
-        st.markdown(respuesta)
-        st.session_state.messages.append({"role": "assistant", "content": respuesta})
-
-if st.sidebar.button("Limpiar"):
-    st.session_state.messages = []
-    st.rerun()
+        try:
+            # Petición directa al modelo
+            response = model.generate_content(prompt)
+            st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
+        except Exception as e:
+            st.error(f"Error técnico: {e}")
